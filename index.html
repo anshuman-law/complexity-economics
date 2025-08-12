@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Complexity Economics ABM</title>
+  <style>
+    :root{
+      --bg:#0f172a; /* slate-900 */
+      --panel:#111827; /* gray-900 */
+      --muted:#334155; /* slate-600 */
+      --text:#e5e7eb; /* gray-200 */
+      --accent:#22c55e; /* green-500 */
+      --accent2:#60a5fa; /* blue-400 */
+      --danger:#f97316; /* orange-500 */
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,"Noto Sans",sans-serif;background:var(--bg);color:var(--text)}
+    .wrap{display:grid;grid-template-columns:1fr;gap:12px;max-width:1200px;margin:0 auto;padding:12px}
+    @media(min-width:960px){.wrap{grid-template-columns:330px 1fr}}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));border:1px solid rgba(255,255,255,0.08);border-radius:16px;box-shadow:0 10px 25px rgba(0,0,0,0.25)}
+    .panel{padding:14px}
+    h1{font-size:20px;margin:0 0 6px}
+    h2{font-size:14px;margin:14px 0 8px;color:#cbd5e1}
+    label{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;margin:8px 0;color:#cbd5e1}
+    input[type=range]{width:52%}
+    input[type=number], select{width:52%;padding:6px 8px;border-radius:8px;border:1px solid rgba(255,255,255,0.12);background:#0b1220;color:var(--text)}
+    .btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+    button{padding:8px 12px;border-radius:999px;border:1px solid rgba(255,255,255,0.14);background:#0b1220;color:var(--text);cursor:pointer}
+    button.primary{background:var(--accent);border-color:transparent;color:#07140a}
+    button.warn{background:var(--danger);color:#1b0b05;border-color:transparent}
+    .grid2{display:grid;grid-template-columns:1fr;gap:12px}
+    @media(min-width:720px){.grid2{grid-template-columns:1fr 1fr}}
+    canvas{display:block;width:100%;height:auto;border-radius:14px;background:#0b1220;border:1px solid rgba(255,255,255,0.08)}
+    .metrics{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+    .metric{background:#0b1220;border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:10px}
+    .metric b{display:block;font-size:12px;color:#a5b4fc}
+    .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:999px;border:1px solid rgba(255,255,255,0.14);background:#0b1220;color:#cbd5e1;font-size:12px}
+    .legend{display:flex;gap:6px;flex-wrap:wrap}
+    .legend span{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#cbd5e1}
+    .dot{width:10px;height:10px;border-radius:50%}
+    .footer{font-size:12px;color:#9ca3af;opacity:0.9}
+    .hr{height:1px;background:rgba(255,255,255,0.08);margin:10px 0}
+    .titlebar{display:flex;align-items:center;justify-content:space-between;gap:10px}
+    .titlebar .right{display:flex;gap:8px;flex-wrap:wrap}
+    .modal{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;align-items:center;justify-content:center;padding:16px}
+    .modal .inner{max-width:800px;width:100%;background:#0b1220;border:1px solid rgba(255,255,255,0.12);border-radius:16px;padding:16px}
+    .kbd{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;font-size:12px;padding:2px 6px;border-radius:6px;background:#111826;border:1px solid rgba(255,255,255,0.1)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card panel">
+      <div class="titlebar">
+        <h1>Complexity Economics ABM</h1>
+        <div class="right">
+          <span class="pill">Seed: <span id="seedLabel"></span></span>
+          <button id="helpBtn">Help</button>
+        </div>
+      </div>
+      <div class="hr"></div>
+      <div id="controlForm">
+        <h2>Simulation controls</h2>
+        <label><span>Consumers</span><input id="consumers" type="number" min="20" max="1000" value="200"></label>
+        <label><span>Firms</span><input id="firms" type="number" min="2" max="6" value="3"></label>
+        <label><span>Network</span>
+          <select id="topology">
+            <option value="random">Random</option>
+            <option value="smallworld" selected>Small‑world</option>
+            <option value="scalefree">Scale‑free</option>
+          </select>
+        </label>
+        <label><span>Topology knob <small style="opacity:.7">p or m</small></span><input id="topoknob" type="range" min="0" max="1" step="0.01" value="0.15"></label>
+        <label><span>Alpha preference weight</span><input id="alpha" type="range" min="0" max="3" step="0.01" value="1.3"></label>
+        <label><span>Beta price sensitivity</span><input id="beta" type="range" min="0" max="5" step="0.01" value="1.6"></label>
+        <label><span>Gamma network influence</span><input id="gamma" type="range" min="0" max="3" step="0.01" value="0.9"></label>
+        <label><span>Exploration probability</span><input id="pexplore" type="range" min="0" max="0.5" step="0.005" value="0.05"></label>
+        <label><span>Firm learning rate</span><input id="eta" type="range" min="0" max="0.5" step="0.005" value="0.08"></label>
+        <label><span>Tick speed ms</span><input id="speed" type="number" min="0" max="2000" value="80"></label>
+        <div class="btns">
+          <button class="primary" id="startBtn">Start</button>
+          <button id="pauseBtn">Pause</button>
+          <button id="stepBtn">Step</button>
+          <button class="warn" id="resetBtn">Reset</button>
+          <button id="reseeder">Reseed</button>
+        </div>
+      </div>
+
+      <div class="hr"></div>
+      <h2>Live metrics</h2>
+      <div class="metrics" id="metrics">
+        <div class="metric"><b>Tick</b><span id="tick">0</span></div>
+        <div class="metric"><b>HHI</b><span id="hhi">0.00</span></div>
+        <div class="metric"><b>Entropy</b><span id="entropy">0.00</span></div>
+        <div class="metric"><b>Avg price</b><span id="avgPrice">0.00</span></div>
+      </div>
+      <div class="hr"></div>
+      <div class="legend" id="legend"></div>
+    </div>
+
+    <div class="grid2">
+      <div class="card panel">
+        <h2>Adoption network</h2>
+        <canvas id="netCanvas" width="900" height="700"></canvas>
+      </div>
+      <div class="card panel">
+        <h2>Time series</h2>
+        <canvas id="chartCanvas" width="900" height="340"></canvas>
+        <div class="hr"></div>
+        <canvas id="hhiCanvas" width="900" height="200"></canvas>
+      </div>
+    </div>
+
+    <div class="footer">Tip: increase Gamma to watch local cascades and lock‑in. Lower Beta to make buyers less price‑sensitive and see stronger network effects.</div>
+  </div>
+
+  <div class="modal" id="helpModal">
+    <div class="inner">
+      <div class="titlebar"><h1>How this model works</h1><button id="closeHelp">Close</button></div>
+      <p>Consumers choose among firms by maximizing a simple utility that blends intrinsic preference, price, and peer influence on their social network. Firms adapt price based on recent sales momentum with a bit of exploration. You can switch the network topology to see how structure changes outcomes.</p>
+      <ul>
+        <li><span class="kbd">Ui,f = α·pref·quality − β·price + γ·peerShare + noise</span></li>
+        <li>Peer share is the fraction of a consumer’s neighbors who chose firm f in the previous tick.</li>
+        <li>Firms raise or lower prices with learning rate η depending on sales momentum; with probability p<sub>explore</sub> they explore a small random change.</li>
+        <li>Charts show firm market shares and HHI. Network colors show current adoption by firm.</li>
+      </ul>
+    </div>
+  </div>
+
+<script>
+// ---------- seeded RNG ----------
+function mulberry32(a){return function(){var t=a+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296}}
+function randn(rng){ // Box-Muller
+  let u=0,v=0;while(u===0)u=rng();while(v===0)v=rng();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)
+}
+
+// ---------- utilities ----------
+const clamp=(x,min,max)=>Math.max(min,Math.min(max,x));
+const shuffle=(arr,rng)=>{for(let i=arr.length-1;i>0;i--){const j=Math.floor(rng()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]]}return arr};
+
+// ---------- color palette for firms ----------
+const firmColors=["#60a5fa","#22c55e","#f472b6","#f59e0b","#a78bfa","#f43f5e"]; // blue, green, pink, amber, violet, rose
+
+// ---------- global sim state ----------
+let state=null, running=false, raf=null, timer=null, rngSeed=Math.floor(Math.random()*1e9), rng=mulberry32(42);
+
+// ---------- DOM ----------
+const el={
+  seedLabel:document.getElementById('seedLabel'),
+  consumers:document.getElementById('consumers'),
+  firms:document.getElementById('firms'),
+  topology:document.getElementById('topology'),
+  topoknob:document.getElementById('topoknob'),
+  alpha:document.getElementById('alpha'),
+  beta:document.getElementById('beta'),
+  gamma:document.getElementById('gamma'),
+  pexplore:document.getElementById('pexplore'),
+  eta:document.getElementById('eta'),
+  speed:document.getElementById('speed'),
+  start:document.getElementById('startBtn'),
+  pause:document.getElementById('pauseBtn'),
+  step:document.getElementById('stepBtn'),
+  reset:document.getElementById('resetBtn'),
+  reseed:document.getElementById('reseeder'),
+  netCanvas:document.getElementById('netCanvas'),
+  chartCanvas:document.getElementById('chartCanvas'),
+  hhiCanvas:document.getElementById('hhiCanvas'),
+  tick:document.getElementById('tick'),
+  hhi:document.getElementById('hhi'),
+  entropy:document.getElementById('entropy'),
+  avgPrice:document.getElementById('avgPrice'),
+  legend:document.getElementById('legend'),
+  helpBtn:document.getElementById('helpBtn'),
+  helpModal:document.getElementById('helpModal'),
+  closeHelp:document.getElementById('closeHelp'),
+};
+
+el.helpBtn.onclick=()=>el.helpModal.style.display='flex';
+el.closeHelp.onclick=()=>el.helpModal.style.display='none';
+
+function reseed(){ rngSeed = Math.floor(Math.random()*1e9); rng = mulberry32(rngSeed); el.seedLabel.textContent = String(rngSeed) }
+reseed();
+
+// ---------- network generators ----------
+function erdosRenyi(n, p){
+  const adj=Array.from({length:n},()=>new Set());
+  for(let i=0;i<n;i++){
+    for(let j=i+1;j<n;j++){
+      if(rng()<p){adj[i].add(j);adj[j].add(i)}
+    }
+  }
+  return adj;
+}
+function wattsStrogatz(n, k=4, beta=0.15){
+  k = Math.max(2, k|0); if(k%2===1)k+=1; // even
+  const adj=Array.from({length:n},()=>new Set());
+  // ring lattice
+  for(let i=0;i<n;i++){
+    for(let j=1;j<=k/2;j++){
+      const v=(i+j)%n; adj[i].add(v); adj[v].add(i);
+    }
+  }
+  // rewire
+  for(let i=0;i<n;i++){
+    for(let j=1;j<=k/2;j++){
+      const v=(i+j)%n; if(rng()<beta){
+        // remove edge i-v
+        adj[i].delete(v); adj[v].delete(i);
+        // add edge to new node u not equal to i and not already neighbor
+        let u=i; let tries=0;
+        while((u===i || adj[i].has(u)) && tries<5*n){u=(Math.random(), Math.floor(rng()*n)); tries++}
+        if(u!==i){adj[i].add(u); adj[u].add(i)}
+      }
+    }
+  }
+  return adj;
+}
+function barabasiAlbert(n, m=2){
+  m=Math.max(1,m|0);
+  const adj=Array.from({length:n},()=>new Set());
+  // start with a small complete graph of size m+1
+  for(let i=0;i<m+1;i++) for(let j=i+1;j<m+1;j++){adj[i].add(j);adj[j].add(i)}
+  let degrees=Array(n).fill(0); for(let i=0;i<m+1;i++)degrees[i]=adj[i].size;
+  for(let v=m+1; v<n; v++){
+    // preferential attachment
+    let targets=new Set();
+    let totalDeg = degrees.slice(0,v).reduce((a,b)=>a+b,0) || 1;
+    while(targets.size<m){
+      let r=rng()*totalDeg, acc=0; let u=0;
+      for(let i=0;i<v;i++){acc+=degrees[i]; if(r<=acc){u=i;break}}
+      if(u!==v && !targets.has(u)){targets.add(u)}
+    }
+    targets.forEach(u=>{adj[v].add(u); adj[u].add(v)});
+    degrees[v]=adj[v].size; targets.forEach(u=>degrees[u]=adj[u].size);
+  }
+  return adj;
+}
+
+// layout nodes with fast radial layout
+function layoutPositions(n, adj){
+  const W=el.netCanvas.width, H=el.netCanvas.height;
+  const pos=Array.from({length:n},()=>({x: W/2 + 200*(rng()-0.5), y: H/2 + 200*(rng()-0.5)}));
+  // simple force-directed relax
+  for(let iter=0; iter<250; iter++){
+    for(let i=0;i<n;i++){
+      let fx=0, fy=0;
+      // repulsion
+      for(let j=0;j<n;j++) if(i!==j){
+        const dx=pos[i].x-pos[j].x, dy=pos[i].y-pos[j].y; const d2=dx*dx+dy*dy+1;
+        const f=2000/d2; fx+=dx*f; fy+=dy*f;
+      }
+      // springs
+      adj[i].forEach(j=>{const dx=pos[j].x-pos[i].x, dy=pos[j].y-pos[i].y; fx+=dx*0.02; fy+=dy*0.02;});
+      pos[i].x=clamp(pos[i].x+fx*0.001, 20, W-20);
+      pos[i].y=clamp(pos[i].y+fy*0.001, 20, H-20);
+    }
+  }
+  return pos;
+}
+
+// ---------- model init ----------
+function init(){
+  const N=+el.consumers.value; const F=+el.firms.value; const topo=el.topology.value; const knob=+el.topoknob.value;
+  rng = mulberry32(rngSeed);
+  // network
+  let adj;
+  if(topo==='random'){ const p = clamp(2.5/Math.sqrt(N), 0.01, 0.2); adj = erdosRenyi(N,p) }
+  if(topo==='smallworld'){ const k = Math.max(4, Math.round(Math.log2(N))*2); adj = wattsStrogatz(N, k, knob) }
+  if(topo==='scalefree'){ const m = Math.max(1, Math.round(1+knob*5)); adj = barabasiAlbert(N, m) }
+  const pos = layoutPositions(N, adj);
+
+  // firms
+  const firms=[...Array(F)].map((_,f)=>({
+    id:f,
+    price: 1.0 + f*0.1,
+    quality: 1.0 + (f%2)*0.15,
+    sales: 0,
+    lastSales: 0,
+  }));
+
+  // consumers
+  const consumers=[...Array(N)].map((_,i)=>({
+    id:i,
+    pref:[...Array(F)].map(()=>0.8 + rng()*0.4), // 0.8-1.2
+    choice: Math.floor(rng()*F),
+  }));
+
+  state={
+    t:0, adj, pos, consumers, firms,
+    // charts
+    shareHistory:[], hhiHistory:[], priceHistory: Array.from({length:F},()=>[])
+  };
+  buildLegend(F);
+  drawNetwork();
+  drawCharts();
+  updateMetrics();
+}
+
+function buildLegend(F){
+  el.legend.innerHTML='';
+  for(let f=0; f<F; f++){
+    const span=document.createElement('span');
+    const dot=document.createElement('span'); dot.className='dot'; dot.style.background=firmColors[f%firmColors.length];
+    span.appendChild(dot); span.appendChild(document.createTextNode(' Firm '+(f+1)));
+    el.legend.appendChild(span);
+  }
+}
+
+// ---------- one tick ----------
+function step(){
+  if(!state) return;
+  const alpha=+el.alpha.value, beta=+el.beta.value, gamma=+el.gamma.value;
+  const eta=+el.eta.value, pexplore=+el.pexplore.value;
+  const F=state.firms.length, N=state.consumers.length;
+
+  // compute neighbor choices from previous tick
+  const prevChoice=state.consumers.map(c=>c.choice);
+  const neighborShare=Array.from({length:N},()=>Array(F).fill(0));
+  for(let i=0;i<N;i++){
+    const deg = state.adj[i].size || 1;
+    state.adj[i].forEach(j=>{ neighborShare[i][prevChoice[j]] += 1/deg; });
+  }
+
+  // consumers choose
+  for(let i=0;i<N;i++){
+    const c=state.consumers[i];
+    let bestF=0, bestU=-1e9;
+    for(let f=0; f<F; f++){
+      const firm=state.firms[f];
+      const base = alpha * c.pref[f] * firm.quality - beta * firm.price;
+      const social = gamma * neighborShare[i][f];
+      const noise = 0.05*randn(rng);
+      const U = base + social + noise;
+      if(U>bestU){bestU=U;bestF=f}
+    }
+    c.choice=bestF;
+  }
+
+  // sales accounting
+  state.firms.forEach(f=>{f.lastSales=f.sales; f.sales=0});
+  state.consumers.forEach(c=>{ state.firms[c.choice].sales += 1 });
+
+  // firm price adaptation based on sales momentum
+  state.firms.forEach(firm=>{
+    const momentum = firm.sales - firm.lastSales; // simple proxy
+    let delta = eta * Math.sign(momentum) * 0.05; // price step is scaled
+    if(rng()<pexplore) delta += (rng()-0.5)*0.05; // small random exploration
+    firm.price = clamp(firm.price * (1 + delta), 0.2, 5.0);
+  });
+
+  // record series
+  const shares = state.firms.map(f=>f.sales / N);
+  const hhi = shares.reduce((a,s)=>a + s*s, 0);
+  const entropy = -shares.reduce((a,s)=> a + (s>0? s*Math.log2(s):0), 0);
+  state.shareHistory.push(shares);
+  state.hhiHistory.push(hhi);
+  state.firms.forEach((f,idx)=>state.priceHistory[idx].push(f.price));
+
+  state.t++;
+  drawNetwork();
+  drawCharts();
+  updateMetrics(entropy);
+}
+
+// ---------- drawing ----------
+function drawNetwork(){
+  const ctx=el.netCanvas.getContext('2d');
+  const W=el.netCanvas.width, H=el.netCanvas.height;
+  ctx.clearRect(0,0,W,H);
+  ctx.lineWidth=0.5; ctx.strokeStyle='rgba(148,163,184,0.25)';
+  // edges
+  for(let i=0;i<state.pos.length;i++){
+    state.adj[i].forEach(j=>{ if(j>i){
+      ctx.beginPath(); ctx.moveTo(state.pos[i].x,state.pos[i].y); ctx.lineTo(state.pos[j].x,state.pos[j].y); ctx.stroke();
+    }});
+  }
+  // nodes
+  const r=4.5;
+  for(let i=0;i<state.pos.length;i++){
+    const c=state.consumers[i];
+    ctx.fillStyle=firmColors[c.choice % firmColors.length];
+    ctx.beginPath(); ctx.arc(state.pos[i].x, state.pos[i].y, r, 0, Math.PI*2); ctx.fill();
+  }
+}
+
+function drawCharts(){
+  // market share lines
+  const ctx=el.chartCanvas.getContext('2d');
+  const W=el.chartCanvas.width, H=el.chartCanvas.height; ctx.clearRect(0,0,W,H);
+  ctx.lineWidth=2;
+  const T=state.shareHistory.length; if(T<2) return;
+  const pad=30;
+  // axes
+  ctx.strokeStyle='rgba(148,163,184,0.4)';
+  ctx.beginPath(); ctx.moveTo(pad, H-pad); ctx.lineTo(W-pad, H-pad); ctx.moveTo(pad, pad); ctx.lineTo(pad, H-pad); ctx.stroke();
+  // y ticks
+  ctx.font='12px system-ui'; ctx.fillStyle='#94a3b8';
+  for(let k=0;k<=5;k++){ const y=H-pad - k*(H-2*pad)/5; ctx.fillText((k/5).toFixed(1), 6, y+4); ctx.globalAlpha=0.2; ctx.beginPath(); ctx.moveTo(pad,y); ctx.lineTo(W-pad,y); ctx.stroke(); ctx.globalAlpha=1 }
+  // lines for each firm
+  const F=state.firms.length;
+  for(let f=0; f<F; f++){
+    ctx.strokeStyle=firmColors[f%firmColors.length]; ctx.beginPath();
+    for(let t=0;t<T;t++){
+      const x=pad + t*(W-2*pad)/(Math.max(60,T-1));
+      const y=H-pad - state.shareHistory[t][f]*(H-2*pad);
+      if(t===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  }
+  // legend
+  ctx.fillStyle='#cbd5e1'; ctx.fillText('Market shares', W-140, 20);
+
+  // HHI sparkline
+  const c2=el.hhiCanvas.getContext('2d'); const W2=el.hhiCanvas.width, H2=el.hhiCanvas.height; c2.clearRect(0,0,W2,H2);
+  c2.strokeStyle='#a78bfa'; c2.lineWidth=2; c2.beginPath();
+  for(let t=0;t<T;t++){
+    const x=10 + t*(W2-20)/(Math.max(60,T-1));
+    const y=H2-10 - state.hhiHistory[t]*(H2-20);
+    if(t===0) c2.moveTo(x,y); else c2.lineTo(x,y);
+  }
+  c2.stroke();
+  c2.fillStyle='#a78bfa'; c2.fillText('HHI', 10, 12);
+}
+
+function updateMetrics(entropyVal){
+  el.tick.textContent=state.t;
+  const shares= state.shareHistory[state.shareHistory.length-1] || state.firms.map(_=>0);
+  const hhi = state.hhiHistory[state.hhiHistory.length-1] || 0;
+  const avgPrice = state.firms.reduce((a,f)=>a+f.price,0)/state.firms.length;
+  const entropy = entropyVal ?? 0;
+  el.hhi.textContent=hhi.toFixed(3);
+  el.avgPrice.textContent=avgPrice.toFixed(2);
+  el.entropy.textContent=entropy.toFixed(3);
+}
+
+// ---------- run loop ----------
+function loop(){ step(); const delay=+el.speed.value; timer=setTimeout(()=>{raf=requestAnimationFrame(loop)}, delay) }
+
+// ---------- controls ----------
+function start(){ if(!state) init(); if(!running){ running=true; loop() } }
+function pause(){ running=false; if(timer) clearTimeout(timer); if(raf) cancelAnimationFrame(raf) }
+function reset(){ pause(); init(); }
+
+el.start.onclick=start; el.pause.onclick=pause; el.step.onclick=()=>{ if(!state) init(); step() }; el.reset.onclick=reset;
+
+el.reseed.onclick=()=>{ reseed(); reset(); };
+
+['consumers','firms','topology','topoknob'].forEach(id=>{
+  document.getElementById(id).addEventListener('change', ()=>{ reset() });
+});
+
+// boot
+init();
+</script>
+</body>
+</html>
